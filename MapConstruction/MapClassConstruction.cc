@@ -4,68 +4,6 @@
 #include <stdlib.h>
 #include <time.h>
 
-time_t t;
-
-//Constructor
-MapClass::MapClass(int rows, int columns){
-    m_rows = rows;
-    m_columns = columns;
-    m_cellsToVisit = 0;
-
-    m_initialCellHome.set_row( m_rows/2 - (1 - HOMEROWS%2 + HOMEROWS/2));
-    m_initialCellHome.set_column(m_columns/2 - (1 - HOMECOLUMNS%2 + HOMECOLUMNS/2));
-
-    m_stack.initStack(m_rows*m_columns);
-
-    //Define m_map size
-    m_map = (Cell **)malloc(rows * sizeof(Cell *)); 
-    for (int i=0; i<rows; i++){
-         m_map[i] = (Cell *)malloc(columns * sizeof(Cell)); 
-    }
-}
-
-//Public functions//-----------------------------------------------
-void MapClass::createMap(){
-    // Intializes random number generator
-    srand((unsigned) time(&t));
-    
-    // initialize map
-    initMap();
-
-    createHome();
-
-    m_currentCell = m_map[INITIAL_ROW][INITIAL_COLUMN];    
-    generateRandomMap();
-
-    //Create a second connection in the initial position
-    m_currentCell = m_map[INITIAL_ROW][INITIAL_COLUMN]; 
-    removeWallToSecondConnection();
-    
-    //Ensure that the home door is connected with a corridor
-    connectHome();
-}
-
-void MapClass::printMap(){
-    printf("MAP:\n");
-    for(int row=0; row<m_rows; row++){
-        for(int column=0; column<m_columns; column++){
-            if(m_map[row][column].get_value()==0){
-                printf("%d",m_map[row][column].get_value());
-            }else{
-                printf(" ");
-            }
-        }
-        printf("\n");
-    }
-    printf("\n");
-}
-
-int MapClass::getValue(int row, int column){
-    return m_map[row][column].get_value();
-}
-
-//-------------------------------------------------------------------------
-
 void MapClass::initMap(){
     for(int row=0; row<m_rows; row++){
         for(int column=0; column<m_columns; column++){
@@ -83,67 +21,24 @@ int MapClass::randomRange(int min, int max){
     return rand() % (max - min + 1) + min;
 }
 
-void MapClass::createHome(){
-    // Create home in the map
-    for(int iHomeRow=0; iHomeRow<HOMEROWS; iHomeRow++){
-        for(int iHomeColumn=0; iHomeColumn<HOMECOLUMNS; iHomeColumn++){
-            int row = m_initialCellHome.get_row() + iHomeRow;
-            int column = m_initialCellHome.get_column() + iHomeColumn;
-            visitHomeCell(row,column,home[iHomeRow][iHomeColumn]);
-        }
-    }
-}
-
-void MapClass::visitHomeCell(int row, int column, int value){
-    //Visit the home cells
-    if(!m_map[row][column].get_visited()){
-        m_cellsToVisit = m_cellsToVisit-1;
-    }
-    m_map[row][column].visitHomeCell(value);
-    //Write right map part
-    m_map[row][m_columns-1-column].visitHomeCell(value);
-}
-
-void MapClass::connectHome(){
-    Cell homeDoor = m_initialCellHome;
-    homeDoor.set_column(m_initialCellHome.get_column()+3);
-    findcorridor(homeDoor);    
-}
-void MapClass::findcorridor(Cell homeDoor){
-    Cell top = m_map[homeDoor.get_row()-1][homeDoor.get_column()];
-    Cell left = m_map[homeDoor.get_row()][homeDoor.get_column()-1];
-    Cell right = m_map[homeDoor.get_row()][homeDoor.get_column()+1];
-
-    if(top.get_value() == WALL && left.get_value() == WALL && right.get_value() == WALL){
-        if(top.get_row()!=0){
-            m_map[top.get_row()][top.get_column()].set_value(CORRIDOR);
-            findcorridor(top);
-        }else if(left.get_column()!=0){
-            m_map[left.get_row()][left.get_column()].set_value(CORRIDOR);
-            findcorridor(left);
-        }
-    }
-}
-
 void MapClass::visit(Cell cell){
     if(!m_map[cell.get_row()][cell.get_column()].get_visited()){
         m_cellsToVisit = m_cellsToVisit-1;
     }
     
     m_map[cell.get_row()][cell.get_column()].visit();
-
     //visit right map part
     m_map[cell.get_row()][m_columns-1-cell.get_column()].visit();
 
-    //visit midle map part when in the middle we have a wall when m_columns/2 is a par number, this column is a wall
+    //visit midle map part when in the middle we have a wall. When m_columns is a odd number and m_columns/2 is a par number, this column is a wall
     if(!isPar(cell.get_row()) && isPar(m_columns/2) && cell.get_column()==(m_columns/2)-1){
         m_map[cell.get_row()][m_columns/2].visit();
     }
 }
 
-//---------------Generate Random Map -------------------------------------------------------------
-
 void MapClass::generateRandomMap(){   
+    //---------------Generate Random Map Algorithm---------------------
+
     while(m_cellsToVisit > 0){
         visit(m_currentCell);
 
@@ -221,17 +116,21 @@ Cell MapClass::checkNeighbours(){
 
 void MapClass::removeWalls(Cell nextCell){
     //Remove the wall to make the connection with the neighbour to visit
+    neighbour top = m_currentCell.get_neighbour(TOP);
+    neighbour right = m_currentCell.get_neighbour(RIGHT);
+    neighbour bot = m_currentCell.get_neighbour(BOT);
+    neighbour left = m_currentCell.get_neighbour(LEFT);
 
-    if(m_currentCell.get_neighbour(TOP).row==nextCell.get_row() && m_currentCell.get_neighbour(TOP).column==nextCell.get_column()){
+    if(top.row==nextCell.get_row() && top.column==nextCell.get_column()){
         visit(m_map[m_currentCell.get_row()-1][m_currentCell.get_column()]);
     }
-    if(m_currentCell.get_neighbour(RIGHT).row==nextCell.get_row() && m_currentCell.get_neighbour(RIGHT).column==nextCell.get_column()){
+    if(right.row==nextCell.get_row() && right.column==nextCell.get_column()){
         visit(m_map[m_currentCell.get_row()][m_currentCell.get_column()+1]);
     }
-    if(m_currentCell.get_neighbour(BOT).row==nextCell.get_row() && m_currentCell.get_neighbour(BOT).column==nextCell.get_column()){
+    if(bot.row==nextCell.get_row() && bot.column==nextCell.get_column()){
         visit(m_map[m_currentCell.get_row()+1][m_currentCell.get_column()]);
     }
-    if(m_currentCell.get_neighbour(LEFT).row==nextCell.get_row() && m_currentCell.get_neighbour(LEFT).column==nextCell.get_column()){
+    if(left.row==nextCell.get_row() && left.column==nextCell.get_column()){
         visit(m_map[m_currentCell.get_row()][m_currentCell.get_column()-1]);
     }
 }
@@ -273,6 +172,7 @@ void MapClass::removeWallToSecondConnection(){
 }
 
 bool MapClass::isInHomeRange(Cell cell){
+    //Check if the cell belongs to the home
     int row = cell.get_row();
     int column = cell.get_column();
     int homeRow = m_initialCellHome.get_row();
@@ -285,6 +185,7 @@ bool MapClass::isInHomeRange(Cell cell){
 }
 
 bool MapClass::isAConnection(Cell cell, int neighbour){
+    //Check if exist a connection if we remove the wall
     int row = cell.get_row();
     int column = cell.get_column();
     int value;
